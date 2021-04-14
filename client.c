@@ -15,9 +15,15 @@
 
 int main( int argc, char* argv[] )
 {
+/*        
+    argv[0] 指向程序运行的全路径名
+    argv[1] 指向在bash命令行中执行程序名后的第一个字符串
+    argv[2] 指向执行程序名后的第二个字符串
+*/
     if( argc <= 2 )
     {
-        printf( "usage: %s ip_address port_number\n", basename( argv[0] ) );
+        printf( "base name usage: %s ip_address port_number\n", basename( argv[0] ) );
+        printf( "argv[0] name usage: %s ip_address port_number\n", argv[0] );
         return 1;
     }
     const char* ip = argv[1];
