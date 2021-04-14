@@ -33,20 +33,22 @@ int setnonblocking( int fd )
 
 int main( int argc, char* argv[] )
 {
-    if( argc <= 2 )
+    if( argc <= 1 )
     {
-        printf( "usage: %s ip_address port_number\n", basename( argv[0] ) );
+        printf( "usage: %s port_number\n", basename( argv[0] ) );
         return 1;
     }
-    const char* ip = argv[1];
-    int port = atoi( argv[2] );
+    int port = atoi( argv[1] );
 
     int ret = 0;
     struct sockaddr_in address;
     bzero( &address, sizeof( address ) );
     address.sin_family = AF_INET;
-    inet_pton( AF_INET, ip, &address.sin_addr );
     address.sin_port = htons( port );
+    //So when INADDR_ANY appears, you only need to bind INADDR_ANY to manage a socket. 
+    //No matter which network card the data comes from, 
+    //as long as the data comes from the bound port number, it can be received.
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int listenfd = socket( PF_INET, SOCK_STREAM, 0 );
     assert( listenfd >= 0 );
@@ -59,6 +61,8 @@ int main( int argc, char* argv[] )
 
     client_data* users = new client_data[FD_LIMIT];
     
+    //fd 0 used to be listen socket
+    //fd 1 ~ USER_LIMIT used to be connect socket
     struct pollfd fds[USER_LIMIT+1];
     int user_counter = 0;
     for( int i = 1; i <= USER_LIMIT; ++i )
@@ -79,8 +83,9 @@ int main( int argc, char* argv[] )
             break;
         }
     
-        for( int i = 0; i < user_counter+1; ++i )
+        for( int i = 0; i <= user_counter; ++i )
         {
+            //new connection has come
             if( ( fds[i].fd == listenfd ) && ( fds[i].revents & POLLIN ) )
             {
                 struct sockaddr_in client_address;
@@ -119,7 +124,7 @@ int main( int argc, char* argv[] )
                 }
                 continue;
             }
-            else if( fds[i].revents & POLLRDHUP )
+            else if( fds[i].revents & POLLRDHUP )//peer has disconnected
             {
                 users[fds[i].fd] = users[fds[user_counter].fd];
                 close( fds[i].fd );
@@ -128,7 +133,7 @@ int main( int argc, char* argv[] )
                 user_counter--;
                 printf( "a client left\n" );
             }
-            else if( fds[i].revents & POLLIN )
+            else if( fds[i].revents & POLLIN )//peer have some data
             {
                 int connfd = fds[i].fd;
                 memset( users[connfd].buf, '\0', BUFFER_SIZE );
