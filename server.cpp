@@ -25,8 +25,10 @@ struct client_data
 
 int setnonblocking( int fd )
 {
+    //get status flag
     int old_option = fcntl( fd, F_GETFL );
     int new_option = old_option | O_NONBLOCK;
+    //set status flag
     fcntl( fd, F_SETFL, new_option );
     return old_option;
 }
@@ -126,6 +128,7 @@ int main( int argc, char* argv[] )
             }
             else if( fds[i].revents & POLLRDHUP )//peer has disconnected
             {
+                //switch the final user and the i user
                 users[fds[i].fd] = users[fds[user_counter].fd];
                 close( fds[i].fd );
                 fds[i] = fds[user_counter];
@@ -141,9 +144,13 @@ int main( int argc, char* argv[] )
                 printf( "get %d bytes of client data %s from %d\n", ret, users[connfd].buf, connfd );
                 if( ret < 0 )
                 {
+                    //These calls(recv) return the number of bytes received, or -1 if an
+                    //error occurred.  In the event of an error, errno is set to
+                    //indicate the error.
                     if( errno != EAGAIN )
                     {
                         close( connfd );
+                        //switch the final user and the i user
                         users[fds[i].fd] = users[fds[user_counter].fd];
                         fds[i] = fds[user_counter];
                         i--;
@@ -156,6 +163,7 @@ int main( int argc, char* argv[] )
                 }
                 else
                 {
+                    //recv data
                     for( int j = 1; j <= user_counter; ++j )
                     {
                         if( fds[j].fd == connfd )
@@ -163,12 +171,18 @@ int main( int argc, char* argv[] )
                             continue;
                         }
                         
-                        fds[j].events |= ~POLLIN;
+                        fds[j].events |= ~POLLIN;//not care read
                         fds[j].events |= POLLOUT;
+                        //we care write, because when recv data, we will 
+                        //write to other client but not the recv client
+                        //
+                        //users[connfd].buf is the dest buf, other write buf will pointer to there
                         users[fds[j].fd].write_buf = users[connfd].buf;
                     }
                 }
             }
+            //broadcast
+            //pollout means that the fd is write able
             else if( fds[i].revents & POLLOUT )
             {
                 int connfd = fds[i].fd;
